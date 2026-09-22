@@ -66,11 +66,14 @@ const totVN=R.reduce((a,x)=>a+x.vn,0);
 const totPpto=DATA.ppto_total;
 const diaMax=DATA.dia.filter(d=>d.acum_uf>0).slice(-1)[0]||{dia:0};
 const diaActual=diaMax.dia;
-const DIAS_MES=30, DIAS_HABILES=diaActual;
+const hab=DATA.habiles||{transcurridos:diaActual,total:30};
+const DIAS_MES=30;
 // KPIs
 const pctMes=totVN/totPpto*100;
-const proy=totVN/diaActual*DIAS_MES;
+// proyección por días HÁBILES (más precisa)
+const proy=totVN/hab.transcurridos*hab.total;
 const pctProy=proy/totPpto*100;
+const pctTiempoHabil=hab.transcurridos/hab.total*100;
 const totPol=R.reduce((a,x)=>a+x.pol,0);
 const totCot=R.reduce((a,x)=>a+x.cot,0);
 const cierreTot=totCot>0?(totPol/totCot*100):0;
@@ -81,7 +84,7 @@ document.getElementById('kpis').innerHTML=
  card('Venta Neta del mes','UF '+fmt(totVN),`al día ${diaActual}`,'#4A1E8C')+
  card('Presupuesto del mes','UF '+fmt(totPpto),'venta nueva',' #6B7280')+
  card('Cumplimiento actual',pctMes.toFixed(0)+'%',`faltan UF ${fmt(totPpto-totVN)}`,pctMes>=66?'#1BAF7A':'#D97706')+
- card('Proyección cierre','UF '+fmt(proy),pctProy.toFixed(0)+'% del ppto',pctProy>=100?'#1BAF7A':pctProy>=90?'#D97706':'#B3261E')+
+ card('Proyección cierre','UF '+fmt(proy),pctProy.toFixed(0)+'% ppto · '+hab.transcurridos+'/'+hab.total+' días háb.',pctProy>=100?'#1BAF7A':pctProy>=90?'#D97706':'#B3261E')+
  card('Pólizas emitidas',fmt(totPol),`tasa cierre ${cierreTot.toFixed(1)}%`,'#2a78d6')+
  card('Corredores +4 / +1',fmt((DATA.activacion||{}).c4||0)+' / '+fmt((DATA.activacion||{}).c1||0),'meta 340 / 620','#00B9AE');
 
@@ -99,7 +102,7 @@ new Chart(document.getElementById('cdia'),{type:'line',
  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:11}}},
   tooltip:{callbacks:{label:c=>c.dataset.label+': UF '+fmt(c.raw)}}},
   scales:{y:{ticks:{callback:v=>fmt(v),font:{size:10}}},x:{title:{display:true,text:'Día del mes',font:{size:10}},ticks:{font:{size:9}}}}}});
-document.getElementById('proynote').textContent=`Proyección lineal a fin de mes: UF ${fmt(proy)} (${pctProy.toFixed(0)}% del presupuesto). La venta suele concentrarse hacia el cierre, así que la proyección tiende a ser conservadora.`;
+document.getElementById('proynote').textContent=`Proyección por días hábiles: al día ${diaActual} llevamos ${hab.transcurridos} de ${hab.total} días hábiles (${pctTiempoHabil.toFixed(0)}% del tiempo laboral) y UF ${fmt(totVN)} (${pctMes.toFixed(0)}% del ppto). Proyección a fin de mes: UF ${fmt(proy)} = ${pctProy.toFixed(0)}% del presupuesto. La venta se concentra al cierre, así que suele superar la proyección lineal.`;
 
 // activación de corredores (gauges tipo barra)
 function gauge(lab,real,meta,col){
