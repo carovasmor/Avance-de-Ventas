@@ -52,11 +52,11 @@ footer{padding:20px 5vw;font-size:11px;color:var(--gris)}
 
 <h2>Cumplimiento por ramo</h2>
 <div class="tablewrap"><table id="tramo"><thead><tr>
-<th onclick="sort('ramo')">Ramo</th><th onclick="sort('vn')">Venta Neta UF</th><th onclick="sort('ppto')">Ppto mes</th>
+<th onclick="sort('ramo')">Ramo</th><th onclick="sort('vn')">VN 2026 (al día)</th><th onclick="sort('vn2025')">VN 2025 (mes)</th><th onclick="sort('varpct')">Proy 26 vs 25</th><th onclick="sort('ppto')">Ppto mes</th>
 <th onclick="sort('pct')">% Cumpl.</th><th onclick="sort('proy')">Proyección</th><th onclick="sort('pctproy')">% Proy.</th><th>Avance (proy)</th><th onclick="sort('pol')">Pólizas</th>
 <th onclick="sort('cot')">Cotiz.</th><th onclick="sort('cierre')">Cierre %</th><th onclick="sort('prima')">Prima UF</th><th onclick="sort('emitiendo')">Corr. emit.</th>
 </tr></thead><tbody></tbody></table></div>
-<p class="note">Ordena haciendo clic en los encabezados. Venta Nueva neta del mes en curso. Proyección = venta actual × (22 / 13 días hábiles). La barra muestra el % proyectado vs presupuesto.</p>
+<p class="note">Ordena haciendo clic en los encabezados. Venta Nueva neta del mes en curso. Proyección = venta actual proyectada por días hábiles transcurridos. La barra muestra el % proyectado vs presupuesto. VN 2025 = venta nueva del mismo mes del año anterior (completo). "Proy 26 vs 25" compara la proyección de cierre 2026 (por días hábiles) contra el mes completo 2025 — comparación peras con peras.</p>
 </main>
 <footer>ANS · Documento de trabajo interno. Fuente: informe diario de ventas + presupuesto por ramo (V5). El % de cumplimiento compara la venta acumulada del mes contra el presupuesto mensual completo.</footer>
 <script>
@@ -116,17 +116,25 @@ function gauge(lab,real,meta,col){
 }
 // activación real desde hoja por corredor
 const act=DATA.activacion||{c4:0,c1:0,meta4:340,meta1:620};
+const habF=(DATA.habiles||{transcurridos:13,total:22});
+const diasFalt=habF.total-habF.transcurridos;
+const falta1=Math.max(act.meta1-act.c1,0), falta4=Math.max(act.meta4-act.c4,0);
+const rit1=diasFalt>0?(falta1/diasFalt):0, rit4=diasFalt>0?(falta4/diasFalt):0;
 document.getElementById('actbox').innerHTML=
  gauge('Corredores +1 póliza',act.c1,act.meta1,'#00B9AE')+
  gauge('Corredores +4 pólizas',act.c4,act.meta4,'#4A1E8C')+
- `<p class="note" style="margin-top:6px">Metas mensuales: +1 póliza = ${fmt(act.meta1)} corredores · +4 pólizas = ${fmt(act.meta4)} corredores. Datos al día ${diaActual} — la activación sube fuerte en la última semana del mes.</p>`;
+ `<div style="background:var(--light);border-radius:8px;padding:10px 12px;margin-top:6px;font-size:12px;color:var(--gris)">
+   <b style="color:var(--dark)">Ritmo para llegar a la meta</b> (quedan ${diasFalt} días hábiles):<br>
+   +1: faltan <b>${fmt(falta1)}</b> → <b style="color:#00B9AE">${rit1.toFixed(1)}/día hábil</b>${falta1===0?' ✓ cumplida':''}<br>
+   +4: faltan <b>${fmt(falta4)}</b> → <b style="color:#4A1E8C">${rit4.toFixed(1)}/día hábil</b>
+  </div>`;
 
 // tabla por ramo
 let sortK='vn',sortD=-1;
 function pct(x){return x.ppto>0?x.vn/x.ppto*100:0;}
 const fProy=hab.total/hab.transcurridos; // factor de proyección por días hábiles
 function draw(){
- const rows=[...R].map(x=>{const proy=x.vn*fProy;const pctproy=x.ppto>0?proy/x.ppto*100:0;return {...x,pct:pct(x),proy:proy,pctproy:pctproy};})
+ const rows=[...R].map(x=>{const proy=x.vn*fProy;const pctproy=x.ppto>0?proy/x.ppto*100:0;const v25=x.vn2025||0;const varpct=v25>0?(proy/v25-1)*100:0;return {...x,pct:pct(x),proy:proy,pctproy:pctproy,vn2025:v25,varpct:varpct};})
   .sort((a,b)=>(a[sortK]>b[sortK]?1:a[sortK]<b[sortK]?-1:0)*sortD);
  const maxPct=120;
  document.querySelector('#tramo tbody').innerHTML=rows.map(x=>{
@@ -136,6 +144,8 @@ function draw(){
   return `<tr>
    <td>${x.ramo}</td>
    <td>${fmt(x.vn)}</td>
+   <td>${x.vn2025?fmt(x.vn2025):'—'}</td>
+   <td class="pctcell" style="color:${x.varpct>=0?'#1BAF7A':'#B3261E'}">${(x.vn2025&&x.vn2025>0)?(x.varpct>=0?'+':'')+x.varpct.toFixed(0)+'%':'—'}</td>
    <td>${x.ppto?fmt(x.ppto):'—'}</td>
    <td class="pctcell" style="color:${col}">${x.ppto?p.toFixed(0)+'%':'—'}</td>
    <td>${fmt(x.proy)}</td>
@@ -144,7 +154,11 @@ function draw(){
    <td>${fmt(x.pol)}</td><td>${fmt(x.cot)}</td><td>${x.cierre.toFixed(1)}</td><td>${x.prima.toFixed(1)}</td><td>${fmt(x.emitiendo)}</td>
   </tr>`;}).join('')+
   `<tr style="border-top:2px solid var(--mor);font-weight:bold;background:var(--light)">
-   <td>TOTAL</td><td>${fmt(totVN)}</td><td>${fmt(totPpto)}</td>
+   <td>TOTAL</td>
+   <td>${fmt(totVN)}</td>
+   <td>${fmt(R.reduce((a,x)=>a+(x.vn2025||0),0))}</td>
+   <td class="pctcell" style="color:${(()=>{const t25=R.reduce((a,x)=>a+(x.vn2025||0),0);const pr=totVN*fProy;return (pr/Math.max(t25,1)-1)>=0?'#1BAF7A':'#B3261E';})()}">${(()=>{const t25=R.reduce((a,x)=>a+(x.vn2025||0),0);const pr=totVN*fProy;return t25>0?((pr/t25-1)*100>=0?'+':'')+((pr/t25-1)*100).toFixed(0)+'%':'—';})()}</td>
+   <td>${fmt(totPpto)}</td>
    <td class="pctcell" style="color:${pctMes>=66?'#1BAF7A':'#D97706'}">${pctMes.toFixed(0)}%</td>
    <td>${fmt(totVN*fProy)}</td>
    <td class="pctcell" style="color:${(totVN*fProy/totPpto*100)>=100?'#1BAF7A':(totVN*fProy/totPpto*100)>=85?'#D97706':'#B3261E'}">${(totVN*fProy/totPpto*100).toFixed(0)}%</td>
