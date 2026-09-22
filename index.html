@@ -53,10 +53,10 @@ footer{padding:20px 5vw;font-size:11px;color:var(--gris)}
 <h2>Cumplimiento por ramo</h2>
 <div class="tablewrap"><table id="tramo"><thead><tr>
 <th onclick="sort('ramo')">Ramo</th><th onclick="sort('vn')">Venta Neta UF</th><th onclick="sort('ppto')">Ppto mes</th>
-<th onclick="sort('pct')">% Cumpl.</th><th>Avance</th><th onclick="sort('pol')">Pólizas</th>
+<th onclick="sort('pct')">% Cumpl.</th><th onclick="sort('proy')">Proyección</th><th onclick="sort('pctproy')">% Proy.</th><th>Avance (proy)</th><th onclick="sort('pol')">Pólizas</th>
 <th onclick="sort('cot')">Cotiz.</th><th onclick="sort('cierre')">Cierre %</th><th onclick="sort('prima')">Prima UF</th><th onclick="sort('emitiendo')">Corr. emit.</th>
 </tr></thead><tbody></tbody></table></div>
-<p class="note">Ordena haciendo clic en los encabezados. Venta Nueva neta del mes en curso.</p>
+<p class="note">Ordena haciendo clic en los encabezados. Venta Nueva neta del mes en curso. Proyección = venta actual × (22 / 13 días hábiles). La barra muestra el % proyectado vs presupuesto.</p>
 </main>
 <footer>ANS · Documento de trabajo interno. Fuente: informe diario de ventas + presupuesto por ramo (V5). El % de cumplimiento compara la venta acumulada del mes contra el presupuesto mensual completo.</footer>
 <script>
@@ -124,23 +124,30 @@ document.getElementById('actbox').innerHTML=
 // tabla por ramo
 let sortK='vn',sortD=-1;
 function pct(x){return x.ppto>0?x.vn/x.ppto*100:0;}
+const fProy=hab.total/hab.transcurridos; // factor de proyección por días hábiles
 function draw(){
- const rows=[...R].map(x=>({...x,pct:pct(x)})).sort((a,b)=>(a[sortK]>b[sortK]?1:a[sortK]<b[sortK]?-1:0)*sortD);
+ const rows=[...R].map(x=>{const proy=x.vn*fProy;const pctproy=x.ppto>0?proy/x.ppto*100:0;return {...x,pct:pct(x),proy:proy,pctproy:pctproy};})
+  .sort((a,b)=>(a[sortK]>b[sortK]?1:a[sortK]<b[sortK]?-1:0)*sortD);
  const maxPct=120;
  document.querySelector('#tramo tbody').innerHTML=rows.map(x=>{
   const p=x.pct;const col=p>=90?'#1BAF7A':p>=60?'#D97706':'#B3261E';
-  const bw=Math.min(p/maxPct*100,100);
+  const cp=x.pctproy;const colp=cp>=100?'#1BAF7A':cp>=85?'#D97706':'#B3261E';
+  const bw=Math.min(cp/maxPct*100,100);
   return `<tr>
    <td>${x.ramo}</td>
    <td>${fmt(x.vn)}</td>
    <td>${x.ppto?fmt(x.ppto):'—'}</td>
    <td class="pctcell" style="color:${col}">${x.ppto?p.toFixed(0)+'%':'—'}</td>
-   <td style="text-align:left"><span class="bar" style="width:${bw}px;background:${col}"></span></td>
+   <td>${fmt(x.proy)}</td>
+   <td class="pctcell" style="color:${colp}">${x.ppto?cp.toFixed(0)+'%':'—'}</td>
+   <td style="text-align:left"><span class="bar" style="width:${bw}px;background:${colp}"></span></td>
    <td>${fmt(x.pol)}</td><td>${fmt(x.cot)}</td><td>${x.cierre.toFixed(1)}</td><td>${x.prima.toFixed(1)}</td><td>${fmt(x.emitiendo)}</td>
   </tr>`;}).join('')+
   `<tr style="border-top:2px solid var(--mor);font-weight:bold;background:var(--light)">
    <td>TOTAL</td><td>${fmt(totVN)}</td><td>${fmt(totPpto)}</td>
    <td class="pctcell" style="color:${pctMes>=66?'#1BAF7A':'#D97706'}">${pctMes.toFixed(0)}%</td>
+   <td>${fmt(totVN*fProy)}</td>
+   <td class="pctcell" style="color:${(totVN*fProy/totPpto*100)>=100?'#1BAF7A':(totVN*fProy/totPpto*100)>=85?'#D97706':'#B3261E'}">${(totVN*fProy/totPpto*100).toFixed(0)}%</td>
    <td></td><td>${fmt(totPol)}</td><td>${fmt(totCot)}</td><td>${cierreTot.toFixed(1)}</td><td></td><td>${fmt(corrEmit)}</td></tr>`;
 }
 function sort(k){sortD=(sortK===k)?-sortD:-1;sortK=k;draw();}
